@@ -30,11 +30,42 @@ public class Main {
                 occurrences.add(new AbstractMap.SimpleEntry<>(count, i));
             }
         }
-
+        mergeSort(occurrences);
 
         // Виводимо відсортовані результати
         for (Map.Entry<Integer, Integer> entry : occurrences) {
             System.out.println(entry.getKey() + " " + entry.getValue());
+        }
+    }
+
+    private static void merge(List<Map.Entry<Integer, Integer>> list, List<Map.Entry<Integer, Integer>> left, List<Map.Entry<Integer, Integer>> right) {
+        int i = 0, j = 0, k = 0;
+        while (i < left.size() && j < right.size()) {
+            if (left.get(i).getKey() <= right.get(j).getKey()) {
+                list.set(k++, left.get(i++));
+            } else {
+                list.set(k++, right.get(j++));
+            }
+        }
+        while (i < left.size()) {
+            list.set(k++, left.get(i++));
+        }
+        while (j < right.size()) {
+            list.set(k++, right.get(j++));
+        }
+    }
+
+    // Рекурсивна реалізація злиття двох списків
+    private static void mergeSort(List<Map.Entry<Integer, Integer>> list) {
+        if (list.size() > 1) {
+            int mid = list.size() / 2;
+            List<Map.Entry<Integer, Integer>> left = new ArrayList<>(list.subList(0, mid));
+            List<Map.Entry<Integer, Integer>> right = new ArrayList<>(list.subList(mid, list.size()));
+
+            mergeSort(left);
+            mergeSort(right);
+
+            merge(list, left, right);
         }
     }
 }
