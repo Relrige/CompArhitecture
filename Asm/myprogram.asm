@@ -9,8 +9,11 @@ TailLen EQU 080h
 CommandTail EQU 081h
 
 .DATA 
-VAR  DB 100 DUP('$')
-answer  DB 100 DUP('$')
+    oneChar db ?
+    params db 100h dup('$') 
+    VAR DB 100h DUP('$')
+    mybyte db " $"
+    numparams dw ?
 
 .CODE
 MAIN PROC
