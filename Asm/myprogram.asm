@@ -1,5 +1,5 @@
-.MODEL SMALL
-.STACK 100H
+.model small
+.stack 100h
 
 BufSize         EQU     255             ; Maximum string size (<=255)
 ASCNull         EQU     0               ; ASCII null
@@ -8,47 +8,49 @@ ASClf           EQU     10              ; ASCII line feed
 TailLen EQU 080h 
 CommandTail EQU 081h
 
-.DATA 
+
+.data
     oneChar db ?
     params db 100h dup('$') 
     VAR DB 100h DUP('$')
     mybyte db " $"
     numparams dw ?
 
-.CODE
-MAIN PROC
+    
+.code
+ORG 0100h
+main proc
     MOV AX,@DATA
     MOV eS,AX
 
 
     call GetParams
-    call readPSP
+    call readFile
 
     mov ax,es
     mov ds,ax
-    
     call outPutPSP
 
     mov si, offset params
     mov di, offset VAR
-    call StrPos
- 
+    
+    call CountOccurrences
 
-    mov ax, dx
+
     call numberOutPut2
 
 
 exit2:
     MOV AH,4CH      ;end    
     INT 21H 
-MAIN ENDP
+main endp
+
 CountOccurrences PROC
     push    bx
     push    cx
     push    di
     push    si
-
-    xor     cx, cx          ; Initialize count to 0
+        xor     cx, cx          ; Initialize count to 0
 CountLoop:
     xor     dx, dx
     call    StrPos          ; Call StrPos to find the next occurrence
@@ -113,6 +115,8 @@ a10:
 ret ; Return to caller : 
 Separators ENDP 
 numberOutPut2 PROC
+    cmp ax, 0ffffh
+    je theend
     mov bl,100
     div bl
     add al, 48
@@ -136,6 +140,7 @@ numberOutPut2 PROC
     mov mybyte, ch
     lea dx, mybyte
     call outDx
+theend:
    ret                     ; Return to caller
 numberOutPut2 ENDP
 
@@ -145,7 +150,8 @@ StrPos PROC
         push    cx
         push    di
         push    si
-           call    StrLength       ; Find length of target string
+   
+            call    StrLength       ; Find length of target string
         mov     ax, cx          ; Save length(s2) in ax
         xchg    si, di          ; Swap si and di
         call    StrLength       ; Find length of substring
@@ -164,10 +170,10 @@ q10:
         je q20
         cmp cl,"$"
         je q30
-        cmp ax,dx
-        je q30
         cmp ch, cl
         je qwer
+        cmp dx,ax
+        je q30
         inc di
         jne q11
 qwer:
@@ -178,7 +184,7 @@ q30:
         mov dx, 0ffffh
         xor bx,bx
 q20:
-        sub dx,bx
+        ;sub dx,bx
         pop     si
         pop     di              ; Restore registers
         pop     cx
@@ -265,4 +271,4 @@ exit:
     ret
 readFile ENDP
 
-END MAIN
+end main
