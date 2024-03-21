@@ -17,55 +17,30 @@ CommandTail EQU 081h
 
 .CODE
 MAIN PROC
-MOV AX,@DATA
-MOV DS,AX
-
-LEA DX,MSG1             ;load msg1 into dx
-MOV AH,9                ;set ah to printing string
-INT 21H                 ;displaying msg1
-
-MOV SI, OFFSET VAR   ;sets si to var
-
-COME:   
-MOV AH,1                ;Read Character from Standard Input
-INT 21H                 ;Trigger interrupt 21H to wait for user input and store it in AL.
-
-CMP AL,13         ;check for enter
-JE HERE           ;jump to output (here)
-MOV [SI],AL       ;stroing data at SI
-INC SI            ;   
-JMP COME          ;returning to input
+    MOV AX,@DATA
+    MOV eS,AX
 
 
-HERE:
-MOV AH,2                 
-INT 21H                    
-MOV DL,0DH                  
-MOV DL,0AH                  
-INT 21H                     
+    call GetParams
+    call readPSP
 
-LEA DX,MSG2        
-MOV AH,9            
-INT 21H             
+    mov ax,es
+    mov ds,ax
+    
+    call outPutPSP
 
-
-mov si, offset MSG3 
-mov di, OFFSET VAR
-
-call StrPos
-
-mov si, offset answer
-mov [si], "A"
-inc si
-add dx,30h
-mov [si], dx
-MOV dx, OFFSET answer       
-MOV AH,9                
-INT 21H         ;output
-
-MOV AH,4CH      ;end    
-INT 21H         
+    mov si, offset params
+    mov di, offset VAR
+    call StrPos
  
+
+    mov ax, dx
+    call numberOutPut2
+
+
+exit2:
+    MOV AH,4CH      ;end    
+    INT 21H 
 MAIN ENDP
 CountOccurrences PROC
     push    bx
