@@ -1,20 +1,27 @@
 .MODEL SMALL
 .STACK 100H
-.DATA 
 
-MSG1 DB "Enter your string: $"
-MSG2 DB "Output: $" 
+BufSize         EQU     255             ; Maximum string size (<=255)
+ASCNull         EQU     0               ; ASCII null
+ASCcr           EQU     13              ; ASCII carriage return
+ASClf           EQU     10              ; ASCII line feed 
+TailLen EQU 080h 
+CommandTail EQU 081h
+
+.DATA 
 VAR  DB 100 DUP('$')
+answer  DB 100 DUP('$')
 
 .CODE
 MAIN PROC
 MOV AX,@DATA
 MOV DS,AX
-MOV SI,OFFSET VAR   
 
 LEA DX,MSG1             ;load msg1 into dx
 MOV AH,9                ;set ah to printing string
-INT 21H                 ;displaying msg
+INT 21H                 ;displaying msg1
+
+MOV SI, OFFSET VAR   ;sets si to var
 
 COME:   
 MOV AH,1                ;Read Character from Standard Input
@@ -39,16 +46,24 @@ MOV AH,9
 INT 21H             
 
 
+mov si, offset MSG3 
+mov di, OFFSET VAR
 
+call StrPos
 
-
-
-
-MOV Dl,OFFSET VAR       
+mov si, offset answer
+mov [si], "A"
+inc si
+add dx,30h
+mov [si], dx
+MOV dx, OFFSET answer       
 MOV AH,9                
-INT 21H         ;output 
+INT 21H         ;output
+
 MOV AH,4CH      ;end    
 INT 21H         
  
 MAIN ENDP
-END MAIN 
+
+
+END MAIN
