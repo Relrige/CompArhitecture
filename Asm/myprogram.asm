@@ -8,49 +8,169 @@ ASClf           EQU     10              ; ASCII line feed
 TailLen EQU 080h 
 CommandTail EQU 081h
 
-
 .data
     oneChar db ?
-    params db 100h dup('$') 
+    params db 100*255 dup('$') 
     VAR DB 100h DUP('$')
     mybyte db " $"
     numparams dw ?
-
-    
+    keys DB 100h DUP('$')
+    values DB 100h DUP('$')
 .code
 ORG 0100h
 main proc
     MOV AX,@DATA
     MOV eS,AX
 
-
     call GetParams
-    call readFile
+    call readPSP
 
     mov ax,es
     mov ds,ax
+
     call outPutPSP
 
     mov si, offset params
     mov di, offset VAR
     
-    call CountOccurrences
-
-
-    call numberOutPut2
-
+    call PrintAllCountSubStr
+    
+    mov si, offset keys
+    mov di, offset values
+    call PrintAll
+    call bubbleSort
+    call PrintAll
 
 exit2:
     MOV AH,4CH      ;end    
     INT 21H 
 main endp
 
+
+bubbleSort PROC
+    push di
+    push si
+    mov cx, 4
+    ;dec cx  ; count-1
+outerLoop:
+    push cx
+    lea si, values
+    lea di, keys
+innerLoop:
+    mov ax, [si]
+    cmp ax, [si+2]
+    jl nextStep
+    xchg [si+2], ax
+    mov [si], ax
+
+    mov bx, [di]
+    xchg [di+2], bx
+    mov [di], bx
+nextStep:
+    add si, 2
+    add di, 2
+    loop innerLoop
+    pop cx
+    loop outerLoop
+
+    pop si 
+    pop di
+    ret                     
+bubbleSort ENDP
+PrintAll PROC
+    push di
+    push si 
+    call outPutCRLF
+printallLoop:
+    xor ax,ax
+    mov al, byte ptr [si]
+    cmp al,'$'
+    je goOut
+    call numberOutPut2
+    call outPutSpace
+    xor ax,ax
+    mov al, byte ptr [di]
+    call numberOutPut2
+    call outPutCRLF
+    inc si
+    inc di
+    jmp printallLoop
+goOut:
+    pop si 
+    pop di
+    ret                     
+PrintAll ENDP
+
+outPutSpace PROC
+   mov ah, 02h
+   mov dl, ' '
+   int 21h
+ret
+outPutSpace ENDP
+outPutCRLF PROC
+   mov ah, 02h
+   mov dl, ASCcr
+   int 21h
+   mov ah, 02h
+   mov dl, ASClf
+   int 21h
+ret
+outPutCRLF ENDP
+inputKeysValues PROC
+    push di
+    push si
+    push ax 
+    mov di, offset keys
+    mov si, offset values
+    mov [di+byte ptr bx], bx
+    mov [si+byte ptr bx], ax
+    mov ah, 02h
+    mov dx, [di] 
+    int 21h
+    inc bx
+    pop ax
+    pop si
+    pop di
+ret
+inputKeysValues ENDP
+PrintAllCountSubStr PROC
+    xor bx,bx
+startloop:
+    call CountOccurrences
+    call inputKeysValues
+    call numberOutPut2
+    call moveTONextLine
+    cmp dx, 0ffffh
+    je loopend
+    jmp startloop
+loopend:      
+    ret                     ; Return to caller
+PrintAllCountSubStr ENDP
+moveTONextLine PROC
+diLoop:
+    cmp byte ptr [di], ASCcr  
+    je outFunc
+    cmp byte ptr [di], ASClf 
+    je outFunc
+    cmp byte ptr [di], "$" 
+    je EOFExit
+    inc di
+    jmp diLoop
+EOFExit:
+    mov dx, 0ffffh
+    ret
+outFunc:
+    inc di
+    inc di
+    ret                     ; Return to caller
+moveTONextLine ENDP
+
 CountOccurrences PROC
     push    bx
     push    cx
-    push    di
+    ;push    di
     push    si
-        xor     cx, cx          ; Initialize count to 0
+    xor     cx, cx          ; Initialize count to 0
 CountLoop:
     xor     dx, dx
     call    StrPos          ; Call StrPos to find the next occurrence
@@ -60,10 +180,11 @@ CountLoop:
     add     di,dx             ; Move to the next character
     jmp     CountLoop       ; Repeat until end of string
 Done:
+
     mov     ax, cx  
    
     pop     si              ; Restore registers
-    pop     di
+    ;pop     di
     pop     cx
     pop     bx
     ret                     ; Return to caller
@@ -105,16 +226,18 @@ qw60:
         ret                             ; Return to caller
 GetParams ENDP
 Separators PROC 
-mov al, [si] ; Get character at ds:si 
-cmp al, 20h ; Is char a blank? 
-je a10 ; Jump if yes 
-cmp al, 09h ; Is char a tab? 
-je a10 ; Jump if yes 
-cmp al, 00Dh ; Is char a cr? : 
-a10: 
-ret ; Return to caller : 
+        mov al, [si] ; Get character at ds:si 
+        cmp al, 20h ; Is char a blank? 
+        je a10 ; Jump if yes 
+        cmp al, 09h ; Is char a tab? 
+        je a10 ; Jump if yes 
+        cmp al, 00Dh ; Is char a cr? : 
+        a10: 
+        ret ; Return to caller : 
 Separators ENDP 
 numberOutPut2 PROC
+    push ax
+    push bx
     cmp ax, 0ffffh
     je theend
     mov bl,100
@@ -124,8 +247,10 @@ numberOutPut2 PROC
     mov ch,ah
     mov mybyte, cl
     lea dx, mybyte
+    cmp mybyte,'0'
+    je skip
     call outDx
-    
+skip:
     xor ax,ax
     mov al,ch
     mov bl,10
@@ -136,11 +261,16 @@ numberOutPut2 PROC
     mov ch, ah 
     mov mybyte, cl
     lea dx, mybyte
+    cmp mybyte,'0'
+    je skip1
     call outDx
+skip1:
     mov mybyte, ch
     lea dx, mybyte
     call outDx
 theend:
+   pop bx
+   pop ax
    ret                     ; Return to caller
 numberOutPut2 ENDP
 
@@ -151,7 +281,7 @@ StrPos PROC
         push    di
         push    si
    
-            call    StrLength       ; Find length of target string
+        call    StrLength       ; Find length of target string
         mov     ax, cx          ; Save length(s2) in ax
         xchg    si, di          ; Swap si and di
         call    StrLength       ; Find length of substring
@@ -161,7 +291,9 @@ StrPos PROC
         jb      q30            ; Exit if len target < len substring
         mov     dx, 0ffffh      ; Initialize dx to -1
 q11:
-        mov si, offset params
+        pop si
+        push si
+        ;mov si, offset params
 q10:
         inc     dx              ; For i = 0 TO last possible index
         mov     cl, BYTE PTR[di]      ; Save char at s[bx] in cl
@@ -169,6 +301,12 @@ q10:
         cmp ch,"$"
         je q20
         cmp cl,"$"
+        je q30
+        cmp cl,ASCcr
+        je q30
+        cmp cl,ASClf
+        je q30
+        cmp cl,ASCNull
         je q30
         cmp ch, cl
         je qwer
@@ -192,24 +330,6 @@ q20:
         pop     ax
         ret                     ; Return to caller
 StrPos ENDP
-
-StrCompare PROC
-        push    ax              ; Save modified registers
-        push    di
-        push    si
-        cld                     ; Auto-increment si
-@@10:
-        lodsb                   ; al <- [si], si <- si + 1
-        scasb                   ; Compare al and [di]; di <- di + 1
-        jne     @@20            ; Exit if non-equal chars found
-        or      al, al          ; Is al=0? (i.e. at end of s1)
-        jne     @@10            ; If no jump, else exit
-@@20:
-        pop     si              ; Restore registers
-        pop     di
-        pop     ax
-        ret                     ; Return flags to caller
-StrCompare ENDP
 
 StrLength PROC
      push di
@@ -239,13 +359,13 @@ outPutPSP PROC
     MOV AH,9                
     INT 21H 
 
-    mov dx, offset params     
-    MOV AH,9                
-    INT 21H
+;     mov dx, offset params     
+;     MOV AH,9                
+;     INT 21H
     ret
 outPutPSP ENDP
 
-readFile PROC
+readPSP PROC
     mov si, offset VAR
 read_next:
     mov ah, 3Fh
@@ -254,12 +374,8 @@ read_next:
     mov dx, offset oneChar   ; read to ds:dx 
     int 21h                  ;  ax = number of bytes read
     mov bl, oneChar
-    cmp bl,"$"
-    je exit
-    cmp bl,ASClf
-    je exit
-    cmp bl,ASCcr
-    je exit
+    ;cmp bl,"$"
+    ;je exit
     cmp bl,ASCNull
     je exit
     mov es:[si], bl
@@ -269,6 +385,6 @@ read_next:
     jmp exit
 exit:
     ret
-readFile ENDP
+readPSP ENDP
 
 end main
