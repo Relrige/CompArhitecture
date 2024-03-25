@@ -1,7 +1,6 @@
 .model small
 .stack 100h
 
-BufSize         EQU     255             ; Maximum string size (<=255)
 ASCNull         EQU     0               ; ASCII null
 ASCcr           EQU     13              ; ASCII carriage return
 ASClf           EQU     10              ; ASCII line feed 
@@ -10,12 +9,14 @@ CommandTail EQU 081h
 
 .data
     oneChar db ?
-    params db 100*255 dup('$') 
-    VAR DB 100h DUP('$')
+    params db 100 dup('$') 
+    VAR DB 100*255 DUP('$')
     mybyte db " $"
     numparams dw ?
     keys DB 100h DUP('$')
     values DB 100h DUP('$')
+    array_size equ ($ - values)           
+    temp_array DW 100 DUP(?)
 .code
 ORG 0100h
 main proc
@@ -23,12 +24,12 @@ main proc
     MOV eS,AX
 
     call GetParams
-    call readPSP
+    call readFile
 
     mov ax,es
     mov ds,ax
 
-    call outPutPSP
+    ;call outPutPSP
 
     mov si, offset params
     mov di, offset VAR
@@ -37,7 +38,7 @@ main proc
     
     mov si, offset keys
     mov di, offset values
-    call PrintAll
+    ;call mergeSort
     call bubbleSort
     call PrintAll
 
@@ -46,33 +47,32 @@ exit2:
     INT 21H 
 main endp
 
-
 bubbleSort PROC
     push di
     push si
-    mov cx, 4
-    ;dec cx  ; count-1
+    call StrLength
+    dec cx  ; count-1
+    dec cx
 outerLoop:
     push cx
     lea si, values
     lea di, keys
 innerLoop:
-    mov ax, [si]
-    cmp ax, [si+2]
+    mov al, byte ptr[si]
+    cmp al, byte ptr[si+1]
     jl nextStep
-    xchg [si+2], ax
-    mov [si], ax
+    xchg byte ptr[si+1], al
+    mov byte ptr[si], al
 
-    mov bx, [di]
-    xchg [di+2], bx
-    mov [di], bx
+    mov bl, byte ptr[di]
+    xchg byte ptr[di+1], bl
+    mov byte ptr[di], bl
 nextStep:
-    add si, 2
-    add di, 2
+    add si, 1
+    add di, 1
     loop innerLoop
     pop cx
     loop outerLoop
-
     pop si 
     pop di
     ret                     
@@ -80,27 +80,33 @@ bubbleSort ENDP
 PrintAll PROC
     push di
     push si 
-    call outPutCRLF
+    call StrLength
+    dec cx
 printallLoop:
+    cmp cx, 0
+    jle goOut
+    xor ax, ax 
+    mov al, byte ptr [di]
+    cmp al, 0
+    je nextLoop
+    call numberOutPut2
+    call outPutSpace
     xor ax,ax
     mov al, byte ptr [si]
     cmp al,'$'
     je goOut
     call numberOutPut2
-    call outPutSpace
-    xor ax,ax
-    mov al, byte ptr [di]
-    call numberOutPut2
     call outPutCRLF
+nextLoop:
     inc si
     inc di
+    dec cx
     jmp printallLoop
 goOut:
     pop si 
     pop di
     ret                     
 PrintAll ENDP
-
 outPutSpace PROC
    mov ah, 02h
    mov dl, ' '
@@ -124,9 +130,9 @@ inputKeysValues PROC
     mov si, offset values
     mov [di+byte ptr bx], bx
     mov [si+byte ptr bx], ax
-    mov ah, 02h
+    ;mov ah, 02h
     mov dx, [di] 
-    int 21h
+    ;int 21h
     inc bx
     pop ax
     pop si
@@ -138,7 +144,7 @@ PrintAllCountSubStr PROC
 startloop:
     call CountOccurrences
     call inputKeysValues
-    call numberOutPut2
+    ;call numberOutPut2
     call moveTONextLine
     cmp dx, 0ffffh
     je loopend
@@ -148,12 +154,12 @@ loopend:
 PrintAllCountSubStr ENDP
 moveTONextLine PROC
 diLoop:
+    cmp byte ptr [di], "$" 
+    je EOFExit
     cmp byte ptr [di], ASCcr  
     je outFunc
     cmp byte ptr [di], ASClf 
     je outFunc
-    cmp byte ptr [di], "$" 
-    je EOFExit
     inc di
     jmp diLoop
 EOFExit:
@@ -168,7 +174,6 @@ moveTONextLine ENDP
 CountOccurrences PROC
     push    bx
     push    cx
-    ;push    di
     push    si
     xor     cx, cx          ; Initialize count to 0
 CountLoop:
@@ -180,11 +185,8 @@ CountLoop:
     add     di,dx             ; Move to the next character
     jmp     CountLoop       ; Repeat until end of string
 Done:
-
     mov     ax, cx  
-   
     pop     si              ; Restore registers
-    ;pop     di
     pop     cx
     pop     bx
     ret                     ; Return to caller
@@ -216,12 +218,14 @@ qw30:
 qw40:
         call    Separators              ; Check for blank, tab, or cr
         jne     qw50                    ; Jump if not a separator
-        mov     [byte ptr si], 0        ; Change separator to null
+        mov     [byte ptr si], 0ffffh        ; Change separator to null
         inc     bx                      ; Count number of parameters
 qw50:
         inc     si                      ; Point to next character
         loop    qw40                    ; Loop until cx equals 0
 qw60:
+        dec si
+        mov [byte ptr si], '$'
         mov     [numParams], bx         ; Save number of parameters
         ret                             ; Return to caller
 GetParams ENDP
@@ -238,8 +242,9 @@ Separators ENDP
 numberOutPut2 PROC
     push ax
     push bx
+    push cx
     cmp ax, 0ffffh
-    je theend
+    je theEnd
     mov bl,100
     div bl
     add al, 48
@@ -268,10 +273,11 @@ skip1:
     mov mybyte, ch
     lea dx, mybyte
     call outDx
-theend:
+theEnd:
+   pop cx
    pop bx
    pop ax
-   ret                     ; Return to caller
+   ret                    
 numberOutPut2 ENDP
 
 StrPos PROC
@@ -293,7 +299,6 @@ StrPos PROC
 q11:
         pop si
         push si
-        ;mov si, offset params
 q10:
         inc     dx              ; For i = 0 TO last possible index
         mov     cl, BYTE PTR[di]      ; Save char at s[bx] in cl
@@ -306,21 +311,18 @@ q10:
         je q30
         cmp cl,ASClf
         je q30
-        cmp cl,ASCNull
-        je q30
         cmp ch, cl
-        je qwer
+        je q12
         cmp dx,ax
         je q30
         inc di
         jne q11
-qwer:
+q12:
         inc di
         inc si
         jmp q10
 q30:
         mov dx, 0ffffh
-        xor bx,bx
 q20:
         ;sub dx,bx
         pop     si
@@ -355,36 +357,31 @@ outDx PROC
 outDx ENDP
 
 outPutPSP PROC
-    mov dx, offset VAR     
-    MOV AH,9                
-    INT 21H 
+    mov dx, offset VAR     ;outPut input
+    call outDx
 
-;     mov dx, offset params     
-;     MOV AH,9                
-;     INT 21H
+    call outPutSpace   ; space output
+
+    mov dx, offset params     ;outPut subStr
+    call outDx
     ret
 outPutPSP ENDP
 
-readPSP PROC
+readFile PROC
     mov si, offset VAR
 read_next:
     mov ah, 3Fh
-    mov bx, 0h  ; stdin handle
-    mov cx, 1   ; 1 byte to read
+    mov bx, 0h               ; stdin handle
+    mov cx, 1                ; 1 byte to read
     mov dx, offset oneChar   ; read to ds:dx 
     int 21h                  ;  ax = number of bytes read
+    or ax,ax
+    jz exit
     mov bl, oneChar
-    ;cmp bl,"$"
-    ;je exit
-    cmp bl,ASCNull
-    je exit
     mov es:[si], bl
     inc si
-    or ax,ax
-    jnz read_next
-    jmp exit
+    jmp read_next
 exit:
     ret
-readPSP ENDP
-
+readFile ENDP
 end main
