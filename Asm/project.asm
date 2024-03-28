@@ -15,8 +15,7 @@ CommandTail EQU 081h
     numparams dw ?
     keys DB 100h DUP('$')
     values DB 100h DUP('$')
-    array_size equ ($ - values)           
-    temp_array DW 100 DUP(?)
+
 .code
 ORG 0100h
 main proc
@@ -68,8 +67,8 @@ innerLoop:
     xchg byte ptr[di+1], bl
     mov byte ptr[di], bl
 nextStep:
-    add si, 1
-    add di, 1
+    inc si
+    inc di
     loop innerLoop
     pop cx
     loop outerLoop
@@ -77,6 +76,7 @@ nextStep:
     pop di
     ret                     
 bubbleSort ENDP
+
 PrintAll PROC
     push di
     push si 
@@ -130,9 +130,7 @@ inputKeysValues PROC
     mov si, offset values
     mov [di+byte ptr bx], bx
     mov [si+byte ptr bx], ax
-    ;mov ah, 02h
     mov dx, [di] 
-    ;int 21h
     inc bx
     pop ax
     pop si
@@ -344,7 +342,6 @@ count_loop:
     inc     di              ; Move to the next character
     jmp     count_loop      ; Repeat until null terminator found
 end_count: 
-   ;dec cx
    pop si
    pop di
    ret                     ; Return to caller
